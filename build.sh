@@ -73,7 +73,7 @@ mex_build() {
     
     # Coach calls the Melee ABI explicitly; avoid compiler libc builtins.
     opt="${opt} -fno-builtin"
-    if [ "${L7_AUTOLOAD:-0}" = "1" ]; then
+    if [ "${L7_AUTOLOAD:-1}" = "1" ]; then
         opt="${opt} -DL7_AUTOLOAD"
     fi
 

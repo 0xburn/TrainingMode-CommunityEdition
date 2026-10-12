@@ -1,5 +1,5 @@
-/* Autoload-only event-menu process wrapper. This file is compiled into the
- * optional launcher image, never the normal coaching image. */
+/* Boot once from a recognized practice export, or retain normal navigation. */
+#include "autoload_scan.inc"
 #define L7_EVENT_CONTROL ((void (*)(GOBJ *))0x8024d864)
 #define L7_EVENT_CONTROL_CALLBACK ((void *)0x8024d864)
 #define L7_EVENT_GOBJ (*(GOBJ **)0x804d6c60)
@@ -23,7 +23,7 @@ static void L7_AutoloadEventThink(GOBJ *gobj)
     /* mnEvent_8024D864 owns both readiness counters. Let it advance them and
      * create its event-list GObj before supplying the one confirmed input. */
     if (L7_MENU_CURRENT != 7 || L7_MENU_COOLDOWN != 0 ||
-        L7_EVENT_INITIAL_WAIT != 0 || L7_EVENT_GOBJ == 0)
+        L7_EVENT_INITIAL_WAIT != 0 || L7_EVENT_GOBJ == 0 || Memcard_CheckStatus() == 11)
     {
         L7_EVENT_CONTROL(gobj);
         return;
@@ -33,6 +33,15 @@ static void L7_AutoloadEventThink(GOBJ *gobj)
     if (l7_event_control_proc != 0)
         l7_event_control_proc->cb = L7_EVENT_CONTROL_CALLBACK;
 
+    L7AutoFile selected;
+    if (L7_AutoBypass() || !L7_AutoFind(&selected)) {
+        OSReport("L7 AUTOLOAD normal menu phase=%d seen=%d candidates=%d\n", l7_auto_scan_phase, l7_auto_scan_seen, l7_auto_scan_candidates);
+        L7_EVENT_CONTROL(gobj);
+        return;
+    }
+    /* Existing import handoff byte; CSS consumes -2 before setting card A. */
+    *(s8 *)R13_OFFSET(-0x466F) = -2;
+    OSReport("L7 AUTOLOAD boot=%s\n", selected.name);
     stc_memcard->TM_EventPage = 1;
     stc_memcard->EventBackup.event = 0;
     /* The native handler selects first_event + page from this live object. */
@@ -68,8 +77,14 @@ static void L7_AutoloadPoll(GOBJ *gobj)
 {
     GOBJProc *proc;
 
-    if (l7_autoload_complete || L7_MENU_CURRENT != 7)
+    if (l7_autoload_complete) return;
+    if (L7_AutoBypass()) {
+        l7_autoload_complete = 1;
+        *(s8 *)R13_OFFSET(-0x466F) = -1;
+        OSReport("L7 AUTOLOAD bypass B\n");
         return;
+    }
+    if (L7_MENU_CURRENT != 7) return;
     proc = L7_FindEventControlProc();
     if (proc == 0)
         return;

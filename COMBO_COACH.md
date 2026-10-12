@@ -22,27 +22,27 @@ It defaults to zero and does not repair missed hits or positioning errors.
 
 ## Build
 
-Follow the upstream toolchain instructions in `DEVELOPMENT.md`. The normal build
-includes coaching and preserves normal boot/menu navigation:
+Follow the upstream toolchain instructions in `DEVELOPMENT.md`. The standard
+build supports both automatic folder imports and traditional manual Import:
 
 ```sh
 ./build.sh /path/to/your/melee.iso release
 ```
 
-An optional build enters Training Lab on startup and imports a specially named
-file from memory card A:
+Configure Dolphin Slot A as a GCI folder, choose a familiar folder ending in
+`USA`, and save a new Lucky Stats practice export there. On startup, CE loads the
+newest recognized export by its embedded millisecond export time. Holding B
+through startup bypasses automatic loading. With no eligible file, normal menus
+remain available; later visits to character select never auto-import again.
 
-```sh
-L7_AUTOLOAD=1 ./build.sh /path/to/your/melee.iso release
-```
+See [the user guide](COMBO_COACH_IMPORT.md) for Windows/macOS setup and both import
+flows. Maintainers can compile out the boot hooks with
+`L7_AUTOLOAD=0 ./build.sh /path/to/your/melee.iso release`.
 
-The auto-load hooks are compiled only with `L7_AUTOLOAD`. A host launcher selects
-the desired `.gci`, copies it to Dolphin's GCI-folder card A, and sets the copy's
-32-byte internal filename field at offsets 8–39 to ASCII `TMREC_L7AUTOLOAD`, padded
-with zeroes. It leaves the source unchanged. The hooks use the native event menu
-handler and Training Lab's existing import path to select characters/stage and
-load the recording. They do not search macOS folders or automate desktop input.
-Missing imports fall back to character select. Remove the staged copy on exit.
+The existing development launcher remains compatible: its explicitly staged
+`TMREC_L7AUTOLOAD` copy takes priority over timestamped folder exports. The native
+hooks use the event menu handler and Training Lab's normal import path. No desktop
+input automation or runtime debugger is needed for folder imports.
 
 This is source for a development build, not a packaged launcher or game download.
 No ISO or tournament recording is included. Module builds have been checked with
