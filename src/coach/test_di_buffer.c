@@ -2,7 +2,7 @@
 #include <assert.h>
 #include <stdio.h>
 int main(void){
- L7DIHit hits[]={{100,105,1},{120,126,2},{140,143,1},{144,147,1}};
+ L7DIHit hits[]={{.frame=100,.last_input=105,.kind=1},{.frame=120,.last_input=126,.kind=2},{.frame=140,.last_input=143,.kind=1},{.frame=144,.last_input=147,.kind=1}};
  L7DIState s;
  for(int delta=-3;delta<=3;delta++){
   l7_di_reset(&s,hits,4,100);
@@ -24,5 +24,53 @@ int main(void){
  l7_di_reset(&s,hits,4,100);assert(s.cursor==0&&s.matched==-1);
  assert(l7_di_match(&s,hits,4,140,1,3)==2); /* Skipped hits expire. */
  assert(l7_di_sample(&s,hits,4,140,4)==0); /* No pre-impact override. */
+ /* Each tech choice is attached to the hit that actually caused it. */
+ L7Fighter reference[32]={0};
+ L7DIHit tech_hit={.frame=2,.last_input=6,.kind=1};
+ for(int f=0;f<32;f++)reference[f]=(L7Fighter){.state=87,.percent=10,.facing=1};
+ int outcomes[]={183,191,199,200,201,202,203,204};
+ for(int o=0;o<8;o++){
+  reference[14].state=outcomes[o];
+  l7_tech_reference(&tech_hit,reference,sizeof(*reference),32);
+  assert(tech_hit.tech_frame==14&&tech_hit.tech_state==outcomes[o]);
+  assert(tech_hit.tech_x==(outcomes[o]==200?80:outcomes[o]==201?-80:0));
+  for(int delta=-2;delta<=3;delta++){
+   l7_di_reset(&s,&tech_hit,1,0);
+   assert(l7_di_match(&s,&tech_hit,1,2+delta,1,3)==0);
+   L7Fighter live={.state=87,.hitlag=1};
+   assert(l7_tech_response(&s,&tech_hit,1,4+delta,&live)==-1);
+   l7_di_sample(&s,&tech_hit,1,7+delta,0); /* Ending DI must retain tech ownership. */
+   live.hitlag=0;
+   assert(l7_tech_response(&s,&tech_hit,1,7+delta,&live)==(delta?0:-1));
+   assert(l7_tech_response(&s,&tech_hit,1,17+delta,&live)==(delta?0:-1));
+   assert(l7_tech_response(&s,&tech_hit,1,18+delta,&live)==-1);
+  }
+  l7_di_reset(&s,&tech_hit,1,0);l7_di_match(&s,&tech_hit,1,3,1,3);
+  L7Fighter live={.state=outcomes[o]};
+  assert(l7_tech_response(&s,&tech_hit,1,15,&live)==-1&&s.tech_matched==-1);
+ }
+ reference[14].state=200;reference[14].facing=-1;
+ l7_tech_reference(&tech_hit,reference,sizeof(*reference),32);assert(tech_hit.tech_x==-80);
+ reference[10].percent=11;
+ l7_tech_reference(&tech_hit,reference,sizeof(*reference),32);assert(!tech_hit.tech_frame);
+ reference[10].percent=10;reference[10].state=14;
+ l7_tech_reference(&tech_hit,reference,sizeof(*reference),32);assert(!tech_hit.tech_frame);
+ reference[10].state=87;reference[10].dead=1;
+ l7_tech_reference(&tech_hit,reference,sizeof(*reference),32);assert(!tech_hit.tech_frame);
+ reference[10].dead=0;
+ l7_tech_reference(&tech_hit,reference,sizeof(*reference),32);
+ l7_di_reset(&s,&tech_hit,1,0);l7_di_match(&s,&tech_hit,1,3,1,3);
+ assert(s.tech_matched==0);
+ assert(l7_di_match(&s,&tech_hit,1,4,2,3)==-1&&s.tech_matched==-1); /* Interrupting wrong move. */
+ l7_di_reset(&s,&tech_hit,1,0);assert(s.tech_matched==-1);
+ L7DIHit wide={.frame=100,.last_input=106,.kind=17,.tech_frame=126,.tech_state=199};
+ for(int delta=-14;delta<=14;delta++){
+  l7_di_reset(&s,&wide,1,0);
+  assert(l7_di_match(&s,&wide,1,100+delta,17,14)==0);
+  L7Fighter live={.state=87};
+  assert(l7_tech_response(&s,&wide,1,107+delta,&live)==(delta?0:-1));
+ }
+ l7_di_reset(&s,&wide,1,0);assert(l7_di_match(&s,&wide,1,114,17,13)==-1&&s.tech_matched==-1);
  puts("DI buffer: boundaries, early/late, wrong/skipped/repeated hits, hitlag exit and reset passed");
+ puts("Tech buffer: all choices, facing, early/late, exact timing, interruption, timeout and reset passed");
 }

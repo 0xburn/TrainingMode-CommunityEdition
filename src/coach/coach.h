@@ -30,11 +30,14 @@ typedef struct {
     L7Attempt current,attempts[L7_MAX_ATTEMPTS];
 } L7Coach;
 typedef struct { int hits,total,gap,started,closed; } L7Progress;
-typedef struct { int frame,last_input,kind; } L7DIHit;
-typedef struct { int cursor,matched,onset; } L7DIState;
+typedef struct { int frame,last_input,kind,tech_frame,tech_state,tech_x; } L7DIHit;
+typedef struct { int cursor,matched,onset,tech_matched,tech_until; } L7DIState;
 void l7_di_reset(L7DIState*,const L7DIHit*,int,int);
 int l7_di_match(L7DIState*,const L7DIHit*,int,int,int,int);
 int l7_di_sample(L7DIState*,const L7DIHit*,int,int,float);
+int l7_tech_outcome(int);
+void l7_tech_reference(L7DIHit*,const L7Fighter*,int,int);
+int l7_tech_response(L7DIState*,const L7DIHit*,int,int,const L7Fighter*);
 int l7_direct_hit(const L7Fighter*,const L7Fighter*);
 int l7_combo_end(const L7Fighter*,int,int,int);
 int l7_combo_hits(const L7Fighter*,int,int,int);
