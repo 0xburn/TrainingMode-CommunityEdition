@@ -71,6 +71,34 @@ int main(void){
   assert(l7_tech_response(&s,&wide,1,107+delta,&live)==0);
  }
  l7_di_reset(&s,&wide,1,0);assert(l7_di_match(&s,&wide,1,114,17,13)==-1&&s.tech_matched==-1);
+ /* Preserve the launch before arming a recorded ground tech. This is a
+  * geometric phase, not a fixed delay or the size of the timing window. */
+ for(int f=0;f<32;f++)reference[f]=(L7Fighter){.state=89,.percent=10,.y=27,.facing=1};
+ reference[1]=(L7Fighter){.state=183,.grounded=1,.percent=0,.y=27};
+ reference[8].y=30;reference[14].state=199;
+ l7_tech_reference(&tech_hit,reference,sizeof(*reference),32);
+ assert(tech_hit.tech_bounce&&tech_hit.tech_state==199);
+ assert(l7_tech_compatible(&tech_hit,&reference[1]));
+ L7Fighter airborne_down={.state=183,.grounded=0,.y=27};
+ assert(!l7_tech_compatible(&tech_hit,&airborne_down));
+ for(int delta=-14;delta<=14;delta++){
+  l7_di_reset(&s,&tech_hit,1,0);assert(l7_di_match(&s,&tech_hit,1,2+delta,1,14)==0);
+  L7Fighter live={.state=89,.hitlag=1,.y=40};
+  assert(l7_tech_response(&s,&tech_hit,1,3+delta,&live)==-1&&s.tech_wait_bounce);
+  live.hitlag=0;
+  assert(l7_tech_response(&s,&tech_hit,1,7+delta,&live)==0&&s.tech_wait_bounce);
+  live.y=39; /* Still at/below the impact surface: never enable instant tech. */
+  assert(l7_tech_response(&s,&tech_hit,1,8+delta,&live)==0&&s.tech_wait_bounce);
+  live.y=42;
+  assert(l7_tech_response(&s,&tech_hit,1,9+delta,&live)==0&&!s.tech_wait_bounce);
+  live.y=39; /* Falling back to the surface retains the final tech option. */
+  assert(l7_tech_response(&s,&tech_hit,1,13+delta,&live)==0&&!s.tech_wait_bounce);
+ }
+ reference[1].grounded=0;reference[1].state=89;
+ l7_tech_reference(&tech_hit,reference,sizeof(*reference),32);assert(!tech_hit.tech_bounce);
+ assert(l7_tech_compatible(&tech_hit,&airborne_down));
+ reference[1].grounded=1;reference[8].y=27;
+ l7_tech_reference(&tech_hit,reference,sizeof(*reference),32);assert(!tech_hit.tech_bounce);
  puts("DI buffer: boundaries, early/late, wrong/skipped/repeated hits, hitlag exit and reset passed");
  puts("Tech buffer: all choices, facing, early/late, exact timing, interruption, timeout and reset passed");
 }

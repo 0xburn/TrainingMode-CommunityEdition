@@ -152,8 +152,8 @@ static void L7_BuildDI(void){
   L7DIHit *hit=&l7_di_hits[l7_di_count++];
   *hit=(L7DIHit){.frame=f,.last_input=end-1,.kind=l7_reference[f].fighter[0].attack_kind};
   l7_tech_reference(hit,&l7_reference[0].fighter[1],sizeof(L7Sample),l7_length+1);
-  OSReport("L7 DI REF frame=%d last=%d kind=%d\n",f,end-1,l7_reference[f].fighter[0].attack_kind);
-  if(hit->tech_frame)OSReport("L7 TECH REF hit=%d frame=%d state=%d x=%d\n",f,hit->tech_frame,hit->tech_state,hit->tech_x);
+  OSReport("L7 DI REF frame=%d last=%d kind=%d before_ground=%d before_state=%d\n",f,end-1,l7_reference[f].fighter[0].attack_kind,l7_reference[f-1].fighter[1].grounded,l7_reference[f-1].fighter[1].state);
+  if(hit->tech_frame)OSReport("L7 TECH REF hit=%d frame=%d state=%d x=%d bounce=%d\n",f,hit->tech_frame,hit->tech_state,hit->tech_x,hit->tech_bounce);
  }
  if(L7_On(C_TELEMETRY))OSReport("L7 TECH TABLE address=%x stride=%d count=%d\n",(u32)l7_di_hits,sizeof(L7DIHit),l7_di_count);
 }
@@ -457,14 +457,14 @@ static void L7_AfterInputs(void){
    input.btn_L=input.btn_R=input.btn_Z=0;input.trigger=0;
    input.stickX=hit->tech_x;input.stickY=0;
    cpu->input.since_rapid_lr=-1;cpu->input.timer_lstick_smash_x=-1;
-   cpu->input.timer_LR=hit->tech_state==183||hit->tech_state==191?-1:0;
+   cpu->input.timer_LR=l7_di.tech_wait_bounce||hit->tech_state==183||hit->tech_state==191?-1:0;
    if(hit->tech_state==202||hit->tech_state==203){
     input.btn_x=input.btn_y=0;
     input.stickY=hit->tech_state==203?80:0;
     cpu->input.timer_xy=hit->tech_state==203?0:-1;
    }
    Record_SetInputs(Fighter_GetGObj(1),&input,0);
-   if(L7_On(C_TELEMETRY))OSReport("L7 TECH APPLY frame=%d hit=%d state=%d x=%d until=%d\n",frame,hit->frame,hit->tech_state,hit->tech_x,l7_di.tech_until);
+   if(L7_On(C_TELEMETRY))OSReport("L7 TECH APPLY frame=%d hit=%d state=%d x=%d until=%d waiting_bounce=%d\n",frame,hit->frame,hit->tech_state,hit->tech_x,l7_di.tech_until,l7_di.tech_wait_bounce!=0);
   }
  }else {l7_di.matched=l7_di.tech_matched=-1;l7_di_applied=0;}
  if(l7.mode==L7_ACTIVE&&L7_On(C_OPPONENT)==2){
@@ -498,7 +498,13 @@ static void L7_Post(void){
    if(!l7_ready&&frame>0&&f.percent>l7_reference[frame-1].fighter[1].percent+.01f)OSReport("L7 DAMAGE frame=%d direct=%d instance=%d source=%x attacker=%x kind=%d\n",frame,f.direct_hit,f.hit_instance,(u32)((FighterData*)Fighter_GetGObj(1)->userdata)->dmg.hit_log.source,(u32)Fighter_GetGObj(0),L7_Fighter(0).attack_kind);
    if(l7.mode==L7_ACTIVE){
     if(l7_direct_hit(&l7_di_previous,&f)&&L7_On(C_OPPONENT)==0&&L7_On(C_DI_BUFFER)>0){
+     FighterData *cpu=Fighter_GetGObj(1)->userdata;
+     OSReport("L7 HIT PHYS frame=%d before_ground=%d before_state=%d ground=%d kx=%.6f ky=%.6f\n",frame,l7_di_previous.grounded,l7_di_previous.state,f.grounded,cpu->phys.kb_vel.X,cpu->phys.kb_vel.Y);
      int matched=l7_di_match(&l7_di,l7_di_hits,l7_di_count,frame,L7_Fighter(0).attack_kind,L7_On(C_DI_BUFFER));
+     if(matched>=0&&!l7_tech_compatible(&l7_di_hits[matched],&l7_di_previous)){
+      l7_di.tech_matched=-1;l7_di.tech_wait_bounce=0;
+      OSReport("L7 TECH SKIP frame=%d hit=%d reason=airborne_before_ground_bounce\n",frame,l7_di_hits[matched].frame);
+     }
      if(matched>=0)OSReport("L7 DI MATCH frame=%d reference=%d delta=%d window=%d kind=%d\n",frame,l7_di_hits[matched].frame,frame-l7_di_hits[matched].frame,L7_On(C_DI_BUFFER),L7_Fighter(0).attack_kind);
      else OSReport("L7 DI MISS frame=%d window=%d kind=%d\n",frame,L7_On(C_DI_BUFFER),L7_Fighter(0).attack_kind);
     }
