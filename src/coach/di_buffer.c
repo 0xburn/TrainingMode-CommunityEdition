@@ -37,10 +37,21 @@ int l7_di_sample(L7DIState *s,const L7DIHit *hits,int count,int frame,float rema
 /* NTSC common states: missed ground tech (183/191), then the six passive states. */
 int l7_tech_outcome(int state){return state==183||state==191||(state>=199&&state<=204);}
 static int l7_tech_flying(int state){return (state>=75&&state<=91)||state==38;}
-int l7_tech_compatible(const L7DIHit *hit,const L7Fighter *before){
- /* DownBound can still be airborne despite drawing the fighter on the floor.
-  * Its launch cannot be made equivalent by changing a tech input. */
- return !hit->tech_bounce||before->grounded;
+/* Called once at a matched impact, before hitlag DI. A downed fighter may
+ * still be internally airborne at the same floor contact. Give that narrow
+ * case the native grounded-spike vertical launch, retaining live horizontal
+ * knockback and position. Other air hits retain the defensive choice without
+ * waiting for a ground rebound that their trajectory cannot produce. */
+int l7_tech_prepare(L7DIState *s,const L7DIHit *hits,int count,const L7Fighter *before,
+                    int at_floor,float *velocity_y,float bounce_decay){
+ int i=s->tech_matched;
+ if(i<0||i>=count||!hits[i].tech_bounce||before->grounded)return 0;
+ if((before->state==183||before->state==191)&&at_floor&&*velocity_y<0&&bounce_decay>0){
+  *velocity_y=-*velocity_y*bounce_decay;
+  return 1;
+ }
+ s->tech_wait_bounce=0;
+ return 0;
 }
 void l7_tech_reference(L7DIHit *hit,const L7Fighter *first,int stride,int count){
  hit->tech_frame=hit->tech_state=hit->tech_x=hit->tech_bounce=0;

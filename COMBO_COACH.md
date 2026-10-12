@@ -20,8 +20,11 @@ The optional opponent DI buffer matches direct hits by attack and timing, uses
 the recorded sticks during hitlag, and preserves the recorded tech response for
 matched hits, including exact-frame matches. This includes missed tech, tech in place and world-direction
 rolls, plus wall/ceiling tech choices. A recorded ground bounce is preserved before
-enabling the subsequent ground tech; this assistance is skipped if the live hit
-catches an airborne opponent instead of a grounded one. CE's normal collision handling still decides
+enabling the subsequent ground tech. For an early downed rehit at a live floor
+surface, it corrects the downward vertical launch using Melee's grounded-spike
+bounce coefficient before DI. Horizontal knockback remains live. Other airborne
+hits retain the tech choice without waiting for a ground bounce. This physics
+assist shares the DI buffer setting; zero disables both. CE's normal collision handling still decides
 whether the opponent reaches a surface. Response assistance ends on the tech,
 interruption, recovery, death, reset, or its bounded deadline. Matching the hit frame alone does not guarantee the same landing timing. The setting defaults to zero and does not repair
 missed hits or positioning errors. Ground-tech responses are exercised in the

@@ -28,7 +28,7 @@ static L7Sample *l7_reference;
 static int l7_ready,l7_length,l7_loop,l7_last_post=-1,l7_saved_attempts,l7_reference_errors;
 static int l7_test_target=-1,l7_last_mode=-1,l7_buffer_until=-1,l7_buffer_kind;
 /* Native acceptance can target a later input sequence; ordinary play ignores it. */
-static int l7_test_shift_from;
+static int l7_test_shift_from, l7_test_shift_amount;
 static RecInputs l7_buffer_input,l7_effective;
 static int l7_override;
 static int l7_consumed_buttons;
@@ -222,7 +222,7 @@ static void L7_Init(void){
  }
  OSReport("L7 CONTROL options=%x stride=%d value=%d command=%x\n",(u32)L7_Options,sizeof(EventOption),offsetof(EventOption,val),(u32)&l7_pending_command);
  OSReport("L7 PAUSE address=%x\n",(u32)&LabOptions_General[OPTGEN_FRAME].val);
- if(L7_On(C_TELEMETRY))OSReport("L7 TEST_SHIFT address=%x\n",(u32)&l7_test_shift_from);
+ if(L7_On(C_TELEMETRY))OSReport("L7 TEST_SHIFT address=%x amount=%x\n",(u32)&l7_test_shift_from,(u32)&l7_test_shift_amount);
  OSReport("L7 INIT frames=%d config=%x human=%x cpu=%x\n",l7_length,(u32)&L7_Options,(u32)Fighter_GetGObj(0)->userdata,(u32)Fighter_GetGObj(1)->userdata);
  l7_was_enabled=L7_On(C_ENABLED);l7_saved_loop=LabOptions_Record[OPTREC_LOOP].val;l7_saved_restore=LabOptions_Record[OPTREC_AUTORESTORE].val;l7_saved_counter=LabOptions_Record[OPTREC_PLAYBACK_COUNTER].val;
  if(l7_length>0&&L7_On(C_ENABLED)){
@@ -342,7 +342,7 @@ static RecInputs L7_ScriptInput(int frame){
   int target=l7_length;
   for(int i=0;i<l7_group_count;i++)if(l7_groups[i].aerial&&l7_groups[i].frame>l7_entry){target=l7_groups[i].frame;break;}
   if(l7_test_shift_from>0)target=l7_test_shift_from;
-  int shift=scenario==6?3:scenario==7?-3:7;
+  int shift=l7_test_shift_amount?l7_test_shift_amount:scenario==6?3:scenario==7?-3:7;
   if(frame>=target-4){int source=clamp(frame-shift,1,r->num);return r->inputs[source-1];}
  }
  RecInputs input=r->inputs[frame-1];
@@ -501,9 +501,15 @@ static void L7_Post(void){
      FighterData *cpu=Fighter_GetGObj(1)->userdata;
      OSReport("L7 HIT PHYS frame=%d before_ground=%d before_state=%d ground=%d kx=%.6f ky=%.6f\n",frame,l7_di_previous.grounded,l7_di_previous.state,f.grounded,cpu->phys.kb_vel.X,cpu->phys.kb_vel.Y);
      int matched=l7_di_match(&l7_di,l7_di_hits,l7_di_count,frame,L7_Fighter(0).attack_kind,L7_On(C_DI_BUFFER));
-     if(matched>=0&&!l7_tech_compatible(&l7_di_hits[matched],&l7_di_previous)){
-      l7_di.tech_matched=-1;l7_di.tech_wait_bounce=0;
-      OSReport("L7 TECH SKIP frame=%d hit=%d reason=airborne_before_ground_bounce\n",frame,l7_di_hits[matched].frame);
+     if(matched>=0&&l7_di_hits[matched].tech_bounce&&!l7_di_previous.grounded){
+      Vec3 surface,normal;int line,kind;
+      float x=cpu->phys.pos.X,y=cpu->phys.pos.Y;
+      /* Query the live surface; stale collision indices can survive a ledge
+       * departure. No position snap or forced action-state transition. */
+      int at_floor=GrColl_RaycastGround(&surface,&line,&kind,&normal,-1,-1,-1,0,x,y+.5f,x,y-.5f,0);
+      float old_y=cpu->phys.kb_vel.Y;
+      int rebound=l7_tech_prepare(&l7_di,l7_di_hits,l7_di_count,&l7_di_previous,at_floor,&cpu->phys.kb_vel.Y,(*stc_ftcommon)->x1ec);
+      OSReport("L7 TECH LAUNCH frame=%d hit=%d rebound=%d at_floor=%d ky=%.6f/%.6f\n",frame,l7_di_hits[matched].frame,rebound,at_floor,old_y,cpu->phys.kb_vel.Y);
      }
      if(matched>=0)OSReport("L7 DI MATCH frame=%d reference=%d delta=%d window=%d kind=%d\n",frame,l7_di_hits[matched].frame,frame-l7_di_hits[matched].frame,L7_On(C_DI_BUFFER),L7_Fighter(0).attack_kind);
      else OSReport("L7 DI MISS frame=%d window=%d kind=%d\n",frame,L7_On(C_DI_BUFFER),L7_Fighter(0).attack_kind);

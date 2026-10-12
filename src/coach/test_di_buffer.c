@@ -78,9 +78,29 @@ int main(void){
  reference[8].y=30;reference[14].state=199;
  l7_tech_reference(&tech_hit,reference,sizeof(*reference),32);
  assert(tech_hit.tech_bounce&&tech_hit.tech_state==199);
- assert(l7_tech_compatible(&tech_hit,&reference[1]));
+
  L7Fighter airborne_down={.state=183,.grounded=0,.y=27};
- assert(!l7_tech_compatible(&tech_hit,&airborne_down));
+ /* Only a matched downward launch of a downed fighter at a live floor is
+  * normalized. Grounded / rising / distant / ordinary aerial hits are intact. */
+ for(int state=0;state<4;state++)for(int ground=0;ground<2;ground++)for(int floor=0;floor<2;floor++)for(int rising=0;rising<2;rising++){
+  int states[]={183,191,184,89};
+  L7Fighter before={.state=states[state],.grounded=ground};
+  l7_di_reset(&s,&tech_hit,1,0);l7_di_match(&s,&tech_hit,1,2,1,14);
+  float vy=rising?2.5f:-2.5f;
+  int wanted=state<2&&!ground&&floor&&!rising;
+  assert(l7_tech_prepare(&s,&tech_hit,1,&before,floor,&vy,.8f)==wanted);
+  assert(vy==(wanted?2.f:rising?2.5f:-2.5f));
+  assert(s.tech_matched==0); /* Never drop the recorded defensive choice. */
+  assert(!!s.tech_wait_bounce==!!(ground||wanted));
+ }
+ l7_di_reset(&s,&tech_hit,1,0);assert(l7_di_match(&s,&tech_hit,1,2,1,0)==-1);
+ float disabled_vy=-2.5f;
+ assert(!l7_tech_prepare(&s,&tech_hit,1,&airborne_down,1,&disabled_vy,.8f)&&disabled_vy==-2.5f);
+ for(int window=0;window<=14;window+=14){
+  l7_di_reset(&s,&tech_hit,1,0);l7_di_match(&s,&tech_hit,1,100,1,window);
+  float vy=-2.5f;
+  assert(!l7_tech_prepare(&s,&tech_hit,1,&airborne_down,1,&vy,.8f)&&vy==-2.5f);
+ }
  for(int delta=-14;delta<=14;delta++){
   l7_di_reset(&s,&tech_hit,1,0);assert(l7_di_match(&s,&tech_hit,1,2+delta,1,14)==0);
   L7Fighter live={.state=89,.hitlag=1,.y=40};
@@ -96,7 +116,7 @@ int main(void){
  }
  reference[1].grounded=0;reference[1].state=89;
  l7_tech_reference(&tech_hit,reference,sizeof(*reference),32);assert(!tech_hit.tech_bounce);
- assert(l7_tech_compatible(&tech_hit,&airborne_down));
+
  reference[1].grounded=1;reference[8].y=27;
  l7_tech_reference(&tech_hit,reference,sizeof(*reference),32);assert(!tech_hit.tech_bounce);
  puts("DI buffer: boundaries, early/late, wrong/skipped/repeated hits, hitlag exit and reset passed");
