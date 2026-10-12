@@ -18,11 +18,10 @@ before the countdown; preview mode advances that queue through its clip. Best an
 latest direct-hit completion are shown in the HUD. Projectiles do not count.
 The optional opponent DI buffer matches direct hits by attack and timing, uses
 the recorded sticks during hitlag, and preserves the recorded tech response for
-early/late matched hits. This includes missed tech, tech in place and world-direction
+matched hits, including exact-frame matches. This includes missed tech, tech in place and world-direction
 rolls, plus wall/ceiling tech choices. CE's normal collision handling still decides
 whether the opponent reaches a surface. Response assistance ends on the tech,
-interruption, recovery, death, reset, or its bounded deadline. Exact-timing hits
-keep their original tech inputs. The setting defaults to zero and does not repair
+interruption, recovery, death, reset, or its bounded deadline. Matching the hit frame alone does not guarantee the same landing timing. The setting defaults to zero and does not repair
 missed hits or positioning errors. Ground-tech responses are exercised in the
 macOS fixture; wall/ceiling choices have portable policy coverage only.
 

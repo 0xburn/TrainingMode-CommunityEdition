@@ -15,8 +15,8 @@ int l7_di_match(L7DIState *s,const L7DIHit *hits,int count,int frame,int kind,in
  }
  if(best>=0){
   s->matched=best;s->cursor=best+1;
-  /* Exact timing needs no tech assistance and retains the original input history. */
-  if(frame!=hits[best].frame&&hits[best].tech_frame>0){
+  /* A zero timing delta does not imply identical spacing or landing timing. */
+  if(hits[best].tech_frame>0){
    s->tech_matched=best;s->tech_until=frame+hits[best].tech_frame-hits[best].frame+window;
   }
  }

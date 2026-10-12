@@ -41,8 +41,8 @@ int main(void){
    assert(l7_tech_response(&s,&tech_hit,1,4+delta,&live)==-1);
    l7_di_sample(&s,&tech_hit,1,7+delta,0); /* Ending DI must retain tech ownership. */
    live.hitlag=0;
-   assert(l7_tech_response(&s,&tech_hit,1,7+delta,&live)==(delta?0:-1));
-   assert(l7_tech_response(&s,&tech_hit,1,17+delta,&live)==(delta?0:-1));
+   assert(l7_tech_response(&s,&tech_hit,1,7+delta,&live)==0);
+   assert(l7_tech_response(&s,&tech_hit,1,17+delta,&live)==0);
    assert(l7_tech_response(&s,&tech_hit,1,18+delta,&live)==-1);
   }
   l7_di_reset(&s,&tech_hit,1,0);l7_di_match(&s,&tech_hit,1,3,1,3);
@@ -68,7 +68,7 @@ int main(void){
   l7_di_reset(&s,&wide,1,0);
   assert(l7_di_match(&s,&wide,1,100+delta,17,14)==0);
   L7Fighter live={.state=87};
-  assert(l7_tech_response(&s,&wide,1,107+delta,&live)==(delta?0:-1));
+  assert(l7_tech_response(&s,&wide,1,107+delta,&live)==0);
  }
  l7_di_reset(&s,&wide,1,0);assert(l7_di_match(&s,&wide,1,114,17,13)==-1&&s.tech_matched==-1);
  puts("DI buffer: boundaries, early/late, wrong/skipped/repeated hits, hitlag exit and reset passed");
