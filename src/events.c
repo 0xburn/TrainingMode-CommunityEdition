@@ -1224,8 +1224,15 @@ void OnFileLoad(HSD_Archive *archive) // this function is run right after TmDt i
     *event_vars_ptr_loc = &stc_event_vars;
 }
 
+#ifdef L7_AUTOLOAD
+#include "coach/autoload_events.inc"
+#endif
+
 void OnSceneChange(void)
 {
+#ifdef L7_AUTOLOAD
+    L7_AutoloadInstall();
+#endif
     // Hook exists at 801a4c94
     TM_CreateWatermark();
 

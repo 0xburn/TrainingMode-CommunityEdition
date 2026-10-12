@@ -3,6 +3,16 @@
 
 #include <stddef.h>
 
+static int L7_Pre(void);
+static void L7_AfterInputs(void);
+static float L7_Speed(void);
+static int L7_Enabled(void);
+static void L7_Draw(GOBJ*,int);
+static void L7_Ghost(GOBJ*,int);
+static void L7_Post(void);
+static void L7_Init(void);
+static void L7_Update(void);
+static void L7_Reset(void);
 // Static Variables
 static DIDraw didraws[6];
 static SDIDraw sdidraws[6];
@@ -3761,6 +3771,8 @@ void Record_Think(GOBJ *rec_gobj)
     if (hmn_mode == RECMODE_HMN_PLAYBACK && hmn_inputs->num > input_num) input_num = hmn_inputs->num;
     if (cpu_mode == RECMODE_CPU_PLAYBACK && cpu_inputs->num > input_num) input_num = cpu_inputs->num;
 
+    if(L7_Pre()) return;
+
     // update inputs ---------------------------------------
 
     int adjusted_hmn_mode = hmn_mode;
@@ -3768,6 +3780,8 @@ void Record_Think(GOBJ *rec_gobj)
         adjusted_hmn_mode++;
     Record_Update(0, hmn_inputs, rec_data.hmn_rerecord_inputs, adjusted_hmn_mode);
     Record_Update(1, cpu_inputs, rec_data.cpu_rerecord_inputs, cpu_mode);
+
+    L7_AfterInputs();
 
     // loop inputs check ------------------------------
 
@@ -4631,7 +4645,7 @@ void Record_Restart(Savestate_v1 *savestate, int flags) {
 
     stc_playback_cancelled_hmn = false;
     stc_playback_cancelled_cpu = false;
-    
+    L7_Reset();
     if (mirror) flags |= Savestate_Mirror;
     event_vars->Savestate_Load_v1(savestate, flags);
 }
@@ -4677,7 +4691,7 @@ void Savestates_Update()
                 if (pad == NULL) continue; // Skip if no controller in this port
 
                 // Save state (D-pad right)
-                if (pad->held & HSD_BUTTON_DPAD_RIGHT)
+                if (!L7_Enabled() && (pad->held & HSD_BUTTON_DPAD_RIGHT))
                 {
                     save_timer[port]++;
                     if (save_timer[port] == SAVE_THRESHOLD)
@@ -4695,7 +4709,7 @@ void Savestates_Update()
                 }
 
                 // Load state (D-pad left)
-                if (pad->down & HSD_BUTTON_DPAD_LEFT)
+                if (!L7_Enabled() && (pad->down & HSD_BUTTON_DPAD_LEFT))
                 {
                     // load state
                     Record_LoadSavestate(event_vars->savestate);
@@ -5913,6 +5927,7 @@ void Event_PostThink(GOBJ *gobj)
     ActionLog_Think();
     HitboxTrails_Think();
     Stage_Think();
+    L7_Post();
 }
 
 // Init Function
@@ -5924,6 +5939,8 @@ void Event_Init(GOBJ *gobj)
     FighterData *cpu_data = cpu->userdata;
     GObj_AddProc(gobj, Event_PostThink, 20);
     GObj_AddGXLink(gobj, HitboxTrails_GX, 5, 0);
+    GOBJ *coach_hud=GObj_Create(0,7,0); GObj_AddGXLink(coach_hud,L7_Draw,5,1);
+    GOBJ *coach_ghost=GObj_Create(0,7,0); GObj_AddGXLink(coach_ghost,L7_Ghost,6,1);
 
     // Init runtime options...
     
@@ -6129,6 +6146,8 @@ void Event_Init(GOBJ *gobj)
         LabOptions_CPU[OPTCPU_SHIELD].val = CPUINFSHIELD_OFF;
     }
 
+    L7_Init();
+
     // Aitch: VERY nice for debugging. Please don't remove.
     TMLOG("HMN: %x\tCPU: %x\n", (u32)hmn_data, (u32)cpu_data);
 }
@@ -6136,9 +6155,10 @@ void Event_Init(GOBJ *gobj)
 // Update Function
 void Event_Update(void)
 {
+    L7_Update();
     if (Pause_CheckStatus(1) != 2) {
         float speed = LabOptions_GameSpeeds[LabOptions_General[OPTGEN_SPEED].val];
-        HSD_SetSpeedEasy(speed);
+        HSD_SetSpeedEasy(L7_Enabled()?L7_Speed():speed);
     } else {
         HSD_SetSpeedEasy(1.0);
     }
@@ -6176,7 +6196,7 @@ void Event_Think_LabState_Normal(GOBJ *event) {
     }
     else
     {
-        if (pad->held & HSD_BUTTON_DPAD_DOWN)
+        if (!L7_Enabled() && (pad->held & HSD_BUTTON_DPAD_DOWN))
         {
             move_timer++;
             if (move_timer == MOVE_THRESHOLD)
@@ -6305,6 +6325,7 @@ void Event_Think_LabState_Normal(GOBJ *event) {
             HSD_BUTTON_DPAD_UP | HSD_TRIGGER_L | HSD_TRIGGER_R | HSD_TRIGGER_Z);
     bool takeover_input = (buttons | triggers | sticks) != 0;
     
+    if(L7_Enabled()) takeover_input=false;
     bool fastforwarding = stc_recording_target_frame >= 0;
 
     int takeover_target;
@@ -7051,3 +7072,5 @@ static bool CheckHasJump(GOBJ *g) {
 
     return jumps_used < max_jumps;
 }
+
+#include "coach/adapter.inc"

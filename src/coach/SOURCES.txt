@@ -1,0 +1,14 @@
+GameCube button PNGs, downloaded unchanged from Super Mario Wiki on 2026-10-07.
+Used to identify recorded controller inputs in Melee replay commentary.
+Original game/controller artwork belongs to Nintendo. Super Mario Wiki lists
+these files as fair-use sprites; these are not original Lucky Stats artwork.
+
+A: https://www.mariowiki.com/File:GCN_A.png
+B: https://www.mariowiki.com/File:GCN_B.png
+X: https://www.mariowiki.com/File:GCN_X.png
+Y: https://www.mariowiki.com/File:GCN_Y.png
+L: https://www.mariowiki.com/File:GCN_L.png
+R: https://www.mariowiki.com/File:GCN_R.png
+Z: https://www.mariowiki.com/File:GCN_Z.png
+C: https://www.mariowiki.com/File:GCN_C.png
+Control stick: https://www.mariowiki.com/File:GCN_Stick.png

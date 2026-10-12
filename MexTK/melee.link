@@ -1089,3 +1089,4 @@
 804C20BC:stc_css_pad
 804D50C8:stc_css_unkarr
 CC008000:gx_pipe
+803448D4:ICInvalidateRange

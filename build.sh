@@ -71,6 +71,12 @@ mex_build() {
         local opt="-DTM_DEBUG"
     fi
     
+    # Coach calls the Melee ABI explicitly; avoid compiler libc builtins.
+    opt="${opt} -fno-builtin"
+    if [ "${L7_AUTOLOAD:-0}" = "1" ]; then
+        opt="${opt} -DL7_AUTOLOAD"
+    fi
+
     warn="-Wall -Wextra -Wno-char-subscripts -Wno-builtin-declaration-mismatch -Wno-unused-parameter"
     ${hmex} -q -l "MexTK/melee.link" -f "${warn} ${opt}" -s "${sym}" -t "MexTK/${sym}.txt" -o "${out}" -i ${src} ${dat} || kill_all
     echo built ${out}
