@@ -1,3 +1,6 @@
+#ifndef GEKKO
+#include <math.h>
+#endif
 /* Match direct hits once, in order, by move and absolute timing. A missed or
  * different move cannot borrow the following hit's response by hit ordinal. */
 void l7_di_reset(L7DIState *s,const L7DIHit *hits,int count,int start){
@@ -41,6 +44,36 @@ int l7_sdi_sample(const L7DIState *s,const L7DIHit *hits,int count,int frame){
  const L7DIHit *hit=&hits[s->matched];
  int sample=hit->frame+frame-s->onset;
  return sample<=hit->last_input?sample:0;
+}
+
+/* Reproduce the recorded world-space launch direction using only an angle
+ * attainable by DI from this hit's live incoming knockback. Native hitlag exit
+ * has already handled ASDI/collision and knockback magnitude. Preserve that
+ * magnitude, and leave an already-correct result bit-for-bit unchanged. Copying
+ * stick coordinates alone cannot do this when residual knockback or hit side
+ * changes the incoming angle. This is explicitly an assisted outcome. */
+int l7_di_launch(float incoming_x,float incoming_y,float reference_x,float reference_y,
+                 float max_degrees,float *x,float *y){
+ const float pi=3.14159265358979323846f;
+ float incoming_sq=incoming_x*incoming_x+incoming_y*incoming_y;
+ float reference_sq=reference_x*reference_x+reference_y*reference_y;
+ float live_sq=*x**x+*y**y;
+ if(incoming_sq<.00001f||reference_sq<.00001f||live_sq<.00001f||max_degrees<=0)return 0;
+ float incoming=atan2(incoming_y,incoming_x);
+ float delta=atan2(reference_y,reference_x)-incoming;
+ if(delta>pi)delta-=2*pi;
+ if(delta< -pi)delta+=2*pi;
+ float limit=max_degrees*(pi/180.f);
+ if(delta>limit)delta=limit;
+ if(delta< -limit)delta=-limit;
+ float angle=incoming+delta;
+ float error=angle-atan2(*y,*x);
+ if(error>pi)error-=2*pi;
+ if(error< -pi)error+=2*pi;
+ if(error>-.00001f&&error<.00001f)return 0;
+ float magnitude=sqrtf(live_sq);
+ *x=magnitude*cos(angle);*y=magnitude*sin(angle);
+ return 1;
 }
 
 /* NTSC common states: missed ground tech (183/191), then the six passive states. */

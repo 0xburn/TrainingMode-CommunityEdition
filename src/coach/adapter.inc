@@ -24,7 +24,8 @@ static void L7_Text(const char *text,Rect *rect,float size){
 static L7Coach l7;
 typedef struct { float x,y,size; int active; } L7Hit;
 typedef struct { Vec2 stick; int valid, moved; } L7SDI;
-typedef struct { L7Fighter fighter[2]; L7Hit hit[4]; L7SDI sdi; int valid; } L7Sample;
+typedef struct { Vec2 velocity; int valid; } L7Launch;
+typedef struct { L7Fighter fighter[2]; L7Hit hit[4]; L7SDI sdi; L7Launch launch; int valid; } L7Sample;
 static L7Sample *l7_reference;
 static int l7_ready,l7_length,l7_loop,l7_last_post=-1,l7_saved_attempts,l7_reference_errors;
 static int l7_test_target=-1,l7_last_mode=-1,l7_buffer_until=-1,l7_buffer_kind;
@@ -171,6 +172,29 @@ static void L7_SDIThink(GOBJ *gobj){
  cpu->input.timer_lstick_smash_x=sx;cpu->input.timer_lstick_smash_y=sy;
  if(!moved){cpu->input.timer_lstick_tilt_x=tx;cpu->input.timer_lstick_tilt_y=ty;}
  if(L7_On(C_TELEMETRY))OSReport("L7 SDI APPLY frame=%d sample=%d expected=%d moved=%d dx=%.6f dy=%.6f\n",frame,sample,ref?ref->moved:0,moved,cpu->phys.pos.X-x,cpu->phys.pos.Y-y);
+}
+/* NTSC 1.02 damage hitlag exit. Keep native ASDI and collision, then preserve
+ * the reference launch direction within the live hit's legal DI angle range.
+ * This never snaps positions, copies reference speed, or changes hit timing. */
+static void L7_DIExit(GOBJ *gobj){
+ FighterData *cpu=gobj->userdata;
+ int frame=L7_Frame();
+ float incoming_x=cpu->phys.kb_vel.X,incoming_y=cpu->phys.kb_vel.Y;
+ ((void(*)(GOBJ*))0x8008e714)(gobj);
+ if(!l7_reference||frame<0||frame>=L7_FRAMES||!L7_On(C_ENABLED))return;
+ if(!l7_ready){
+  l7_reference[frame].launch=(L7Launch){.velocity={cpu->phys.kb_vel.X,cpu->phys.kb_vel.Y},.valid=1};
+  if(L7_On(C_TELEMETRY))OSReport("L7 LAUNCH REF frame=%d in_x=%.6f in_y=%.6f x=%.6f y=%.6f\n",frame,incoming_x,incoming_y,cpu->phys.kb_vel.X,cpu->phys.kb_vel.Y);
+  return;
+ }
+ if(l7.mode!=L7_ACTIVE||L7_On(C_OPPONENT)!=0||L7_On(C_DI_BUFFER)<=0||l7_di.matched<0||l7_di.matched>=l7_di_count)return;
+ L7DIHit *hit=&l7_di_hits[l7_di.matched];
+ int sample=hit->last_input+1;
+ if(sample>=L7_FRAMES||!l7_reference[sample].launch.valid)return;
+ Vec2 reference=l7_reference[sample].launch.velocity;
+ float old_x=cpu->phys.kb_vel.X,old_y=cpu->phys.kb_vel.Y;
+ int corrected=l7_di_launch(incoming_x,incoming_y,reference.X,reference.Y,(*stc_ftcommon)->tdi_maxAngle,&cpu->phys.kb_vel.X,&cpu->phys.kb_vel.Y);
+ if(L7_On(C_TELEMETRY))OSReport("L7 LAUNCH APPLY frame=%d hit=%d corrected=%d in_x=%.6f in_y=%.6f native_x=%.6f native_y=%.6f x=%.6f y=%.6f ref_x=%.6f ref_y=%.6f\n",frame,hit->frame,corrected,incoming_x,incoming_y,old_x,old_y,cpu->phys.kb_vel.X,cpu->phys.kb_vel.Y,reference.X,reference.Y);
 }
 static int L7_EventMask(int state,L7Input input){
  int mask=127;
@@ -535,6 +559,7 @@ static void L7_Post(void){
   if(p==1){
    FighterData *sdi_cpu=Fighter_GetGObj(1)->userdata;
    if(sdi_cpu->cb.EveryHitlag==(void*)0x8008e4f0)sdi_cpu->cb.EveryHitlag=L7_SDIThink;
+   if(sdi_cpu->cb.ExitHitlag==(void*)0x8008e714)sdi_cpu->cb.ExitHitlag=L7_DIExit;
    if(!l7_ready&&frame>0&&f.percent>l7_reference[frame-1].fighter[1].percent+.01f)OSReport("L7 DAMAGE frame=%d direct=%d instance=%d source=%x attacker=%x kind=%d\n",frame,f.direct_hit,f.hit_instance,(u32)((FighterData*)Fighter_GetGObj(1)->userdata)->dmg.hit_log.source,(u32)Fighter_GetGObj(0),L7_Fighter(0).attack_kind);
    if(l7.mode==L7_ACTIVE){
     if(l7_direct_hit(&l7_di_previous,&f)&&L7_On(C_OPPONENT)==0&&L7_On(C_DI_BUFFER)>0){

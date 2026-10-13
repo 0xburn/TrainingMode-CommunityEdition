@@ -1,7 +1,31 @@
 #include "coach.h"
 #include <assert.h>
 #include <stdio.h>
+#include <math.h>
 int main(void){
+ /* Castle Guest: opposite-side shine retains prior horizontal knockback.
+  * The same stick would launch near 84 degrees instead of the reference 75. */
+ float x=.437098f,y=3.999934f,energy=x*x+y*y;
+ assert(l7_di_launch(-.042823f,4.023518f,1.039273f,3.909915f,18,&x,&y));
+ assert(fabsf(atan2f(y,x)-atan2f(3.909915f,1.039273f))<.00001f);
+ assert(fabsf(x*x+y*y-energy)<.00001f);
+ float same_x=x,same_y=y;
+ assert(!l7_di_launch(-.042823f,4.023518f,1.039273f,3.909915f,18,&x,&y));
+ assert(x==same_x&&y==same_y);
+ /* Opposite-side launches cannot be reversed by assistance: clamp to DI's
+  * actual range, including both signs and angles crossing +/- pi. */
+ for(int sign=-1;sign<=1;sign+=2){
+  x=4;y=0;
+  assert(l7_di_launch(4,0,-4,sign*.1f,18,&x,&y));
+  assert(fabsf(atan2f(y,x)-sign*18*.01745329252f)<.00001f);
+  assert(fabsf(x*x+y*y-16)<.00001f);
+  x=-4;y=sign*.1f;
+  assert(l7_di_launch(-4,sign*.1f,-4,-sign*.1f,18,&x,&y));
+  assert(fabsf(x+4)<.00001f&&fabsf(y+sign*.1f)<.00001f);
+ }
+ x=0;y=0;assert(!l7_di_launch(0,0,1,1,18,&x,&y));
+ x=1;y=2;assert(!l7_di_launch(1,2,0,0,18,&x,&y));
+ assert(!l7_di_launch(1,2,2,1,0,&x,&y));assert(x==1&&y==2);
  L7DIHit hits[]={{.frame=100,.last_input=105,.kind=1},{.frame=120,.last_input=126,.kind=2},{.frame=140,.last_input=143,.kind=1},{.frame=144,.last_input=147,.kind=1}};
  L7DIState s;
  for(int delta=-3;delta<=3;delta++){

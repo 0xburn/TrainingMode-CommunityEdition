@@ -18,12 +18,18 @@ before the countdown; preview mode advances that queue through its clip. Best an
 latest direct-hit completion are shown in the HUD. Projectiles do not count.
 The optional opponent DI buffer matches direct hits by attack and timing, uses
 the recorded sticks during hitlag, reproduces the observed native SDI steps
-(including UCF decisions) at hit-relative frames, and preserves the recorded tech response for
+(including UCF decisions) at hit-relative frames, and targets the recorded launch
+angle within the live hit's legal DI range. The native hitlag-exit callback handles
+ASDI and collision; assistance rotates the resulting velocity to the attainable
+reference angle while preserving live speed. Identical timing/physics is unchanged.
+This compensates for hit-side and residual-knockback differences that copying
+stick coordinates alone cannot resolve. The buffer also preserves the recorded tech response for
 matched hits, including exact-frame matches. This includes missed tech, tech in place and world-direction
 rolls, plus wall/ceiling tech choices. A recorded ground bounce is preserved before
 enabling the subsequent ground tech. For an early downed rehit at a live floor
 surface, it corrects the downward vertical launch using Melee's grounded-spike
-bounce coefficient before DI. Horizontal knockback remains live. Other airborne
+bounce coefficient before DI. That bounce adjustment retains horizontal knockback
+before the launch-angle assist. Other airborne
 hits retain the tech choice without waiting for a ground bounce. This physics
 assist shares the DI buffer setting; zero disables both. CE's normal collision handling still decides
 whether the opponent reaches a surface. Response assistance ends on the tech,
@@ -76,10 +82,10 @@ assembly patches, including the event-control procedure's priority.
 
 ```sh
 cc -std=c99 -Wall -Wextra -fsanitize=address,undefined \
-  src/coach/coach.c src/coach/test_coach.c -o /tmp/coach-test
+  src/coach/coach.c src/coach/test_coach.c -o /tmp/coach-test -lm
 /tmp/coach-test
 cc -std=c99 -Wall -Wextra -fsanitize=address,undefined \
-  src/coach/coach.c src/coach/test_di_buffer.c -o /tmp/coach-di-test
+  src/coach/coach.c src/coach/test_di_buffer.c -o /tmp/coach-di-test -lm
 /tmp/coach-di-test
 ```
 
