@@ -930,6 +930,7 @@ enum lab_option
     OPTLAB_INFODISP_CPU,
     OPTLAB_CHAR_RNG,
     OPTLAB_STAGE,
+    OPTLAB_COACH,
     OPTLAB_HELP,
     OPTLAB_EXIT,
 
@@ -938,6 +939,7 @@ enum lab_option
 
 static const char *LabOptions_CheckBox[] = {"", "X"};
 
+static EventMenu L7_Menu;
 static EventOption LabOptions_Main[OPTLAB_COUNT] = {
     {
         .kind = OPTKIND_MENU,
@@ -985,13 +987,14 @@ static EventOption LabOptions_Main[OPTLAB_COUNT] = {
         .name = "Stage Options",
         .desc = {"Configure stage behavior."},
     },
+    {.kind=OPTKIND_MENU,.name="Combo Coach Settings",.menu=&L7_Menu},
     {
         .kind = OPTKIND_INFO,
         .name = "Help",
-        .desc = {"D-Pad Left - Load State",
-                 "D-Pad Right - Save State",
-                 "D-Pad Down - Move CPU",
-                 "Hold R in the menu for turbo."},
+        .desc = {"D-Pad Left - Retry",
+                 "D-Pad Up - Watch",
+                 "D-Pad Down - Choose combo hit",
+                 "D-Pad Right - Sequence preview"},
     },
     {
         .kind = OPTKIND_FUNC,

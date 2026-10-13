@@ -23,6 +23,10 @@ void Menu_SelCard_Init(GOBJ *menu_gobj);
 void Menu_SelCard_Exit(GOBJ *menu_gobj);
 void Menu_SelCard_Think(GOBJ *menu_gobj);
 
+#ifdef L7_AUTOLOAD
+static void L7_AutoloadLabCSS(void);
+#endif
+
 // OnLoad
 void OnCSSLoad(HSD_Archive *archive)
 {
@@ -63,6 +67,9 @@ void OnCSSLoad(HSD_Archive *archive)
 
     Cam_Button_Create();
     Hazards_Button_Create();
+#ifdef L7_AUTOLOAD
+    L7_AutoloadLabCSS();
+#endif
 }
 
 void Read_Recordings()
@@ -1289,3 +1296,7 @@ int GetSelectedFighterIdOnCssForHmn() {
     // When any fighters are not selected, this ID seems to be unplayable fighter's ID (26=Masterhand or 33=None basically?). 0-25 are playable fighter's ID.
     return hmnFighterId < 26 ? hmnFighterId : -1;
 }
+
+#ifdef L7_AUTOLOAD
+#include "coach/autoload_lab_css.inc"
+#endif

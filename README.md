@@ -1,3 +1,5 @@
+> Combo Coach fork: [controls and build notes](COMBO_COACH.md) · [automatic and manual import guide](COMBO_COACH_IMPORT.md).
+
 ﻿<p align="center"><img src="Logos/Training-Mode-banner.png"  alt=""  width="300"/></p>
 
 # Training Mode - Community Edition
