@@ -37,6 +37,31 @@ interruption, recovery, death, reset, or its bounded deadline. Matching the hit 
 missed hits or positioning errors. Ground-tech responses are exercised in the
 macOS fixture; wall/ceiling choices have portable policy coverage only.
 
+## Advanced diagnostics
+
+Enabled by default in Combo Coach Settings. The coach shows one measured finding
+and one suggested adjustment when it has evidence beyond an early/late input:
+late hits on a falling lower target, different target height or hit side,
+horizontal spacing, active attacks passing too high/low, confirmed shield contact,
+missed L-cancels, and missing expected attacks. Advice remains after a drop and
+clears on retry/watch; completed combos hide it. Turning the setting off restores
+the existing timing display. It does not change fighter state, inputs or assistance.
+
+Matching uses unused direct hits of the same move within 30 frames, independently
+of the DI buffer. Spatial comparisons are relative to the opponent at each hit,
+not screenshots at different elapsed times. Near-overlapping sides and ambiguous
+whiffs do not receive invented explanations. Shield detection uses CE's existing
+frame-advantage contact record because Melee clears its temporary shield source
+before the post-frame observer runs.
+
+The rules offer practice suggestions, not counterfactual proof that one change
+will reproduce the combo. No LLM or network is required. Developer logs retain the
+live/reference frame, move, timing and spatial deltas; Lucky Stats' local session
+report groups repeated findings across attempts. Native acceptance verifies quiet
+perfect execution and unchanged trajectories with diagnostics on/off, late lower
+targets with DI assistance on/off, missing attacks, missed L-cancels, shield contact
+and reset clearing. Other spatial classifications have portable policy tests.
+
 ## Build
 
 Follow the upstream toolchain instructions in `DEVELOPMENT.md`. The standard
@@ -87,6 +112,9 @@ cc -std=c99 -Wall -Wextra -fsanitize=address,undefined \
 cc -std=c99 -Wall -Wextra -fsanitize=address,undefined \
   src/coach/coach.c src/coach/test_di_buffer.c -o /tmp/coach-di-test -lm
 /tmp/coach-di-test
+cc -std=c99 -Wall -Wextra -fsanitize=address,undefined \
+  src/coach/coach.c src/coach/test_diagnostics.c -lm -o /tmp/coach-diagnostics-test
+/tmp/coach-diagnostics-test
 ```
 
 Prior local Dolphin acceptance on the selected Falco/Fox Battlefield fixture

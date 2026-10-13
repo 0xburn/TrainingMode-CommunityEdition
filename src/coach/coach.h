@@ -32,6 +32,15 @@ typedef struct {
 typedef struct { int hits,total,gap,started,closed; } L7Progress;
 typedef struct { int frame,last_input,kind,tech_frame,tech_state,tech_x,tech_bounce; } L7DIHit;
 typedef struct { int cursor,matched,onset,tech_matched,tech_until,tech_wait_bounce; float tech_start_y; } L7DIState;
+enum { L7_DIAG_NONE,L7_DIAG_LATE_LOW,L7_DIAG_TARGET_HEIGHT,L7_DIAG_SIDE,
+       L7_DIAG_SPACING,L7_DIAG_ATTACK_HEIGHT,L7_DIAG_SHIELD,L7_DIAG_MISSING,L7_DIAG_LCANCEL };
+typedef struct {
+ int code,priority,frame,reference,move,delta;
+ float dx,dy,target_dy;
+} L7Diagnosis;
+L7Diagnosis l7_diagnose_hit(int,int,int,const L7Fighter*,const L7Fighter*,const L7Fighter*,const L7Fighter*,const L7Fighter*);
+L7Diagnosis l7_diagnose_miss(int,int,int,const L7Fighter*,const L7Fighter*,const L7Fighter*,const L7Fighter*,int);
+int l7_diagnostic_offer(L7Diagnosis*,L7Diagnosis);
 void l7_di_reset(L7DIState*,const L7DIHit*,int,int);
 int l7_di_match(L7DIState*,const L7DIHit*,int,int,int,int);
 int l7_di_sample(L7DIState*,const L7DIHit*,int,int,float);

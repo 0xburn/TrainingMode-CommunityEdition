@@ -5,6 +5,7 @@
 static int absolute(int x){return x<0?-x:x;}
 #include "selection.c"
 #include "di_buffer.c"
+#include "diagnostics.c"
 static int clamp(int x,int lo,int hi){return x<lo?lo:x>hi?hi:x;}
 void l7_init(L7Coach *c,L7Config cfg){
     memset(c,0,sizeof(*c));c->config=cfg;

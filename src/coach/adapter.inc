@@ -48,6 +48,11 @@ static L7DIHit l7_di_hits[L7_MAX_EVENTS];
 static int l7_di_count,l7_di_applied;
 static L7DIState l7_di;
 static L7Fighter l7_di_previous;
+static L7Diagnosis l7_diagnosis;
+static L7DIState l7_diagnostic_match;
+static L7Fighter l7_diagnostic_previous[2],l7_diagnostic_candidate[2];
+static int l7_diagnostic_candidate_frame;
+static float l7_diagnostic_candidate_distance;
 static int l7_selected_hit=-1,l7_combo_end_frame,l7_combo_total;
 static int l7_best_hits,l7_latest_hits=-1,l7_good_job_ticks,l7_ui_ticks;
 static int l7_down_held,l7_right_held,l7_preview_active,l7_preview_after_post;
@@ -61,7 +66,7 @@ static const char *l7_speeds[]={"100%","75%","50%","25%"};
 static const char *l7_opponents[]={"Original inputs","Hit-relative DI","Neutral DI"};
 static const char *l7_handoffs[]={"Countdown","Finish action"};
 static const char *l7_scenarios[]={"Human","Perfect","3 frames late","3 frames early","No input","Buffered early","DI test late","DI test early","DI test outside"};
-enum { C_ENABLED,C_LOOP,C_TAKEOVER,C_TIMELINE,C_AUDIO,C_GHOST,C_HITBOX,C_FEEDBACK,C_SPEED,C_BUFFER,C_OPPONENT,C_TRACK,C_TELEMETRY,C_TEST,C_HANDOFF,C_LEAD,C_SHORTCUT,C_PREROLL,C_CELEBRATION,C_DI_BUFFER,C_RESET,C_ARM,C_COUNT };
+enum { C_ENABLED,C_LOOP,C_TAKEOVER,C_TIMELINE,C_AUDIO,C_GHOST,C_HITBOX,C_FEEDBACK,C_SPEED,C_BUFFER,C_OPPONENT,C_TRACK,C_TELEMETRY,C_TEST,C_HANDOFF,C_LEAD,C_SHORTCUT,C_PREROLL,C_CELEBRATION,C_DI_BUFFER,C_DIAGNOSTICS,C_RESET,C_ARM,C_COUNT };
 static void L7_MenuReset(GOBJ*g){l7_pending_command=1;}
 static void L7_MenuTakeover(GOBJ*g){l7_pending_command=2;}
 #define L7_TOGGLE(label,value) {.kind=OPTKIND_STRING,.name=label,.value_num=2,.values=l7_yesno,.val=value}
@@ -80,6 +85,7 @@ static EventOption L7_Options[C_COUNT]={
  {.kind=OPTKIND_INT,.name="Lead-in frames",.value_num=181,.format="%df",.val=CFG_PREROLL},
  L7_TOGGLE("Celebration sound",CFG_CELEBRATION),
  {.kind=OPTKIND_INT,.name="Opponent DI buffer",.value_num=31,.format="%df",.val=CFG_DI_BUFFER},
+ L7_TOGGLE("Advanced diagnostics",CFG_DIAGNOSTICS),
  {.kind=OPTKIND_FUNC,.name="Reset attempt",.OnSelect=L7_MenuReset},
  {.kind=OPTKIND_FUNC,.name="Take over",.OnSelect=L7_MenuTakeover},
 };
@@ -234,6 +240,7 @@ static void L7_BuildEvents(void){
  l7_test_target=-1;
  for(int i=0;i<l7.event_count;i++)if(l7.events[i].frame>CFG_TEST_REQUEST+45 && l7.events[i].kind==L7_JUMP_EVENT){l7_test_target=l7.events[i].frame;break;}
 }
+#include "diagnostics.inc"
 static void L7_SaveProgress(void){
  if(!l7_progress.total||l7_progress_reported)return;
  l7_progress_reported=1;
@@ -259,6 +266,7 @@ static void L7_Reset(void){
  if(l7.mode==L7_ACTIVE){l7_finish(&l7,l7.frame,1);L7_ReportAttempt();}
  OSReport("L7 RESET loop=%d\n",l7_loop);
  l7_reset(&l7,0);l7_last_post=-1;l7_magnify_frame=-1;l7_buffer_until=-1;l7_consumed_buttons=0;l7_scheduled_run=0;l7_last_beat=-1;l7_buffer_applied=0;l7_progress=(L7Progress){0};l7_progress_reported=0;l7_result_improved=0;l7_preview_active=0;l7_di_applied=0;l7_di_reset(&l7_di,l7_di_hits,l7_di_count,0);
+ L7_DiagnosticReset(0);
 }
 static void L7_Init(void){
  l7_init(&l7,(L7Config){.enabled=CFG_ENABLED,.loop=CFG_LOOP,.takeover=CFG_TAKEOVER,.tolerance=CFG_TOLERANCE,.match_window=12,.buffer_frames=CFG_BUFFER,.reset_delay=CFG_RESET_DELAY,.request_deadzone=40,.pending_timeout=180,.attempt_tracking=CFG_TRACK});
@@ -283,8 +291,10 @@ static void L7_Init(void){
   ((void(*)(u32,GOBJ*,u8,u8,GOBJ*))0x8039032c)(2,human,human->p_link,human->p_priority,cpu);
  }
  OSReport("L7 CONTROL options=%x stride=%d value=%d command=%x\n",(u32)L7_Options,sizeof(EventOption),offsetof(EventOption,val),(u32)&l7_pending_command);
+ OSReport("L7 DIAGNOSTICS version=1\n");
  OSReport("L7 PAUSE address=%x\n",(u32)&LabOptions_General[OPTGEN_FRAME].val);
  if(L7_On(C_TELEMETRY))OSReport("L7 TEST_SHIFT address=%x amount=%x\n",(u32)&l7_test_shift_from,(u32)&l7_test_shift_amount);
+ if(L7_On(C_TELEMETRY))OSReport("L7 TEST_INPUTS human=%x cpu=%x\n",(u32)rec_data.hmn_inputs[Record_GetSlot(0)]->inputs,(u32)rec_data.cpu_inputs[Record_GetSlot(1)]->inputs);
  OSReport("L7 INIT frames=%d config=%x human=%x cpu=%x\n",l7_length,(u32)&L7_Options,(u32)Fighter_GetGObj(0)->userdata,(u32)Fighter_GetGObj(1)->userdata);
  l7_was_enabled=L7_On(C_ENABLED);l7_saved_loop=LabOptions_Record[OPTREC_LOOP].val;l7_saved_restore=LabOptions_Record[OPTREC_AUTORESTORE].val;l7_saved_counter=LabOptions_Record[OPTREC_PLAYBACK_COUNTER].val;
  if(l7_length>0&&L7_On(C_ENABLED)){
@@ -478,6 +488,7 @@ static int L7_Pre(void){
   if(!l7.config.countdown){int hit=-1;l7_select_combo(&l7_reference[0].fighter[1],sizeof(L7Sample),l7_length+1,frame,CFG_HIT_WINDOW,&hit);l7_combo_end_frame=hit>=0?l7_combo_end(&l7_reference[0].fighter[1],sizeof(L7Sample),l7_length+1,hit):l7_length;l7_combo_total=l7_combo_hits(&l7_reference[0].fighter[1],sizeof(L7Sample),frame,l7_combo_end_frame);}
   l7_progress=(L7Progress){.total=l7_combo_total};l7_progress_previous=L7_Fighter(1);
   l7_di_previous=l7_progress_previous;l7_di_applied=0;l7_di_reset(&l7_di,l7_di_hits,l7_di_count,frame);
+  L7_DiagnosticReset(frame);
  }
  if(l7.mode==L7_ACTIVE)l7.current.assisted=L7_On(C_BUFFER)>0||L7_On(C_SPEED)>0||L7_On(C_DI_BUFFER)>0;
  if(l7.mode!=l7_last_mode){OSReport("L7 MODE %d frame=%d state=%d\n",l7.mode,frame,fighter.state);l7_last_mode=l7.mode;}
@@ -554,6 +565,7 @@ static void L7_Post(void){
   int saved=event_vars->Savestate_Save_v1(&l7_checkpoints[frame/60],Savestate_Silent|Savestate_Checks);
   if(saved)OSReport("L7 CHECKPOINT frame=%d\n",frame);
  }
+ L7_DiagnosticTick(frame);
  for(int p=0;p<2;p++){
   L7Fighter f=L7_Fighter(p);
   if(p==1){
@@ -636,8 +648,10 @@ static void L7_Draw(GOBJ*g,int pass){
    if(i<2&&first+i+1<sequence_end)L7_IconDirection(-1.5f+i*15,-1.5f,1,0,1.5f);
   }
  }
- if(L7_On(C_FEEDBACK)&&!l7_progress_reported&&l7.mode==L7_ACTIVE&&l7.first_error<0){Rect b={7,6,26,3};sprintf(text,"On time  %d / %d",l7.current.matched,l7.current.total);L7_Text(text,&b,0.34f);}
- if(L7_On(C_FEEDBACK)&&!l7_progress_reported&&l7.mode==L7_ACTIVE&&l7.first_error>=0){Rect b={7,6,26,3};sprintf(text,"%s: %s %df",l7_kind_name(l7.current.first_kind),l7.current.first_error==L7_EARLY?"early":l7.current.first_error==L7_LATE?"late":"missed",absolute(l7.current.first_delta));L7_Text(text,&b,0.34f);}
+ int diagnosis=L7_On(C_DIAGNOSTICS)&&l7_diagnosis.code&&(l7.mode==L7_ACTIVE||l7.mode==L7_REVIEW)&&!(l7_progress_reported&&l7_progress.hits==l7_progress.total);
+ if(diagnosis){char advice[128];L7_DiagnosticText(text,advice);Rect title={7,6,26,3},action={7,3.8f,26,3};L7_Text(text,&title,0.29f);L7_Text(advice,&action,0.28f);}
+ if(!diagnosis&&L7_On(C_FEEDBACK)&&!l7_progress_reported&&l7.mode==L7_ACTIVE&&l7.first_error<0){Rect b={7,6,26,3};sprintf(text,"On time  %d / %d",l7.current.matched,l7.current.total);L7_Text(text,&b,0.34f);}
+ if(!diagnosis&&L7_On(C_FEEDBACK)&&!l7_progress_reported&&l7.mode==L7_ACTIVE&&l7.first_error>=0){Rect b={7,6,26,3};sprintf(text,"%s: %s %df",l7_kind_name(l7.current.first_kind),l7.current.first_error==L7_EARLY?"early":l7.current.first_error==L7_LATE?"late":"missed",absolute(l7.current.first_delta));L7_Text(text,&b,0.34f);}
  if(L7_On(C_TRACK)&&l7_combo_total>0){
   Rect best={7,16,26,3},latest={7,13.5f,26,3},good={7,11,26,3};
   sprintf(text,"Best %d%% (%d/%d hits)",100*l7_best_hits/l7_combo_total,l7_best_hits,l7_combo_total);L7_Text(text,&best,0.28f);
@@ -645,7 +659,7 @@ static void L7_Draw(GOBJ*g,int pass){
   L7_Text(text,&latest,0.28f);
   if(l7_progress_reported&&l7_good_job_ticks>0&&(l7_ui_ticks/12)%2==0)L7_Text("Good job!",&good,0.4f);
  }
- if(L7_On(C_TRACK)&&l7.mode==L7_REVIEW&&l7.attempts_count){
+ if(!diagnosis&&L7_On(C_TRACK)&&l7.mode==L7_REVIEW&&l7.attempts_count){
   L7Attempt *last=&l7.attempts[(l7.attempts_count-1)%L7_MAX_ATTEMPTS];Rect b={7,6,26,3};
   if(last->completed)sprintf(text,"Completed%s",last->assisted?" - Assisted":"");
   else if(last->aborted)sprintf(text,"Attempt reset");
@@ -662,7 +676,7 @@ static void L7_Draw(GOBJ*g,int pass){
  L7_Text("D-pad Up: Watch",&h2,0.27f);
  Rect preview={-31,-12.1f,28,2};L7_Text("D-pad Right: Preview",&preview,0.27f);
  if(l7.mode==L7_DEMO){L7_Text("D-pad Down",&h3,0.25f);L7_Text(l7_selection_failed?"No nearby direct hit":"Choose playback combo hit",&h4,0.24f);}
- if(!show_sequence&&L7_On(C_TRACK)&&l7.attempts_count>=3&&l7.current.first_kind){int count=0;for(int i=0;i<l7.attempts_stored;i++)if(l7.attempts[i].first_kind==l7.current.first_kind&&!l7.attempts[i].aborted)count++;if(count>=3){Rect b={-30,-13,60,3};static const char*drills[]={"Practice movement","Drill jump timing","Drill aerial timing","Drill shine cancels","Drill landing cancels","Drill dash starts","Drill fast falls"};L7_Text(drills[l7.current.first_kind],&b,0.36f);}}
+ if(!L7_On(C_DIAGNOSTICS)&&!show_sequence&&L7_On(C_TRACK)&&l7.attempts_count>=3&&l7.current.first_kind){int count=0;for(int i=0;i<l7.attempts_stored;i++)if(l7.attempts[i].first_kind==l7.current.first_kind&&!l7.attempts[i].aborted)count++;if(count>=3){Rect b={-30,-13,60,3};static const char*drills[]={"Practice movement","Drill jump timing","Drill aerial timing","Drill shine cancels","Drill landing cancels","Drill dash starts","Drill fast falls"};L7_Text(drills[l7.current.first_kind],&b,0.36f);}}
 }
 static void L7_Ghost(GOBJ*g,int pass){
  if(pass!=2||!L7_On(C_ENABLED)||!l7_ready||!l7_reference)return;
