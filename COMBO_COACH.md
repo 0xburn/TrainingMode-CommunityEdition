@@ -131,3 +131,17 @@ uses it to preserve those details; ordinary compatible TM-CE recordings can stil
 be imported. Older-format conversion may reconstruct stale-move history and has
 additional fidelity limits. The browser converter and host launcher remain in
 the separate Lucky Stats repository.
+
+## Native collision fidelity
+
+Training Lab preserves Melee's action-owned nudge flag when CPU intangibility is
+off, including while Combo Coach is disabled. Melee uses this flag during ledge
+attacks; clearing it unconditionally changed body collisions and could derail
+recorded practice sequences. The optional override captures/restores the native
+value and clears its bookkeeping on save loads. This does not force positions.
+
+Unit check: `cc -Wall -Wextra -Werror src/coach/test_native_fidelity.c -o /tmp/ce-fidelity && /tmp/ce-fidelity`.
+
+The same fix passed native continuation checks in the Lucky Stats test build.
+Converter corrections are separate: existing exports need regeneration using
+the updated Lucky Stats converter.

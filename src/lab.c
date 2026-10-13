@@ -13,6 +13,8 @@ static void L7_Post(void);
 static void L7_Init(void);
 static void L7_Update(void);
 static void L7_Reset(void);
+#include "coach/native_fidelity.h"
+static L7NudgeOverride l7_nudge_state;
 // Static Variables
 static DIDraw didraws[6];
 static SDIDraw sdidraws[6];
@@ -4647,6 +4649,7 @@ void Record_Restart(Savestate_v1 *savestate, int flags) {
     stc_playback_cancelled_cpu = false;
     L7_Reset();
     if (mirror) flags |= Savestate_Mirror;
+    l7_nudge_state.active = 0;
     event_vars->Savestate_Load_v1(savestate, flags);
 }
 
@@ -6550,11 +6553,13 @@ void Event_Think(GOBJ *event)
         }
     }
 
+    cpu_data->flags.nudge_disable = l7_nudge_override(&l7_nudge_state, cpu_data,
+        cpu_data->state_id, cpu_data->TM.state_frame,
+        LabOptions_CPU[OPTCPU_INTANG].val == 1, cpu_data->flags.nudge_disable);
     // apply intangibility
     if (LabOptions_CPU[OPTCPU_INTANG].val == 1)
     {
         cpu_data->flags.no_reaction_always = 1;
-        cpu_data->flags.nudge_disable = 1;
         cpu_data->grab.vuln = 0x1FF;
         cpu_data->dmg.percent = 0;
         Fighter_SetHUDDamage(cpu_data->ply, 0);
@@ -6568,7 +6573,6 @@ void Event_Think(GOBJ *event)
     else
     {
         cpu_data->flags.no_reaction_always = 0;
-        cpu_data->flags.nudge_disable = 0;
     }
 
     // apply invisibility
