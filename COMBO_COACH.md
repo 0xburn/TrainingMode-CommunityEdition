@@ -17,7 +17,8 @@ Short is the default countdown. Technique names describe the first three actions
 before the countdown; preview mode advances that queue through its clip. Best and
 latest direct-hit completion are shown in the HUD. Projectiles do not count.
 The optional opponent DI buffer matches direct hits by attack and timing, uses
-the recorded sticks during hitlag, and preserves the recorded tech response for
+the recorded sticks during hitlag, reproduces the observed native SDI steps
+(including UCF decisions) at hit-relative frames, and preserves the recorded tech response for
 matched hits, including exact-frame matches. This includes missed tech, tech in place and world-direction
 rolls, plus wall/ceiling tech choices. A recorded ground bounce is preserved before
 enabling the subsequent ground tech. For an early downed rehit at a live floor

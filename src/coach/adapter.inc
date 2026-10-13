@@ -23,7 +23,8 @@ static void L7_Text(const char *text,Rect *rect,float size){
 #define L7_FRAMES 3601
 static L7Coach l7;
 typedef struct { float x,y,size; int active; } L7Hit;
-typedef struct { L7Fighter fighter[2]; L7Hit hit[4]; int valid; } L7Sample;
+typedef struct { Vec2 stick; int valid, moved; } L7SDI;
+typedef struct { L7Fighter fighter[2]; L7Hit hit[4]; L7SDI sdi; int valid; } L7Sample;
 static L7Sample *l7_reference;
 static int l7_ready,l7_length,l7_loop,l7_last_post=-1,l7_saved_attempts,l7_reference_errors;
 static int l7_test_target=-1,l7_last_mode=-1,l7_buffer_until=-1,l7_buffer_kind;
@@ -134,6 +135,43 @@ static L7Input L7_Assist(int frame,RecInputs effective){
  return L7_FromRecord(&l7_effective);
 }
 static L7Fighter L7_Fighter(int p){FighterData*f=Fighter_GetGObj(p)->userdata;return(L7Fighter){.state=f->state_id,.actionable=CheckOverlay(Fighter_GetGObj(p),OVERLAY_ACTIONABLE),.hitlag=f->flags.hitlag,.dead=f->flags.dead,.hit_instance=f->dmg.atk_instance_hurtby,.direct_hit=f->dmg.hit_log.source==Fighter_GetGObj(1-p),.attack_instance=f->atk_instance,.attack_kind=f->atk_kind,.facing=f->facing_direction,.animation=f->state.frame,.x=f->phys.pos.X,.y=f->phys.pos.Y,.percent=f->dmg.percent,.grounded=f->phys.air_state==0,.fastfall=f->flags.is_fastfall,.lcancel=f->state_id>=70&&f->state_id<=74&&(u8)f->input.timer_trigger_any_ignore_hitlag<7};}
+/* Native damage SDI callback (NTSC 1.02). Observe its actual decision during
+ * reference playback, including UCF's history-dependent extensions. During a
+ * matched live hit, replay that decision through the same callback. Do not edit
+ * position or the global raw-pad history shared with the human controller. */
+static void L7_SDIThink(GOBJ *gobj){
+ FighterData *cpu=gobj->userdata;
+ void (*native)(GOBJ*)=(void*)0x8008e4f0;
+ int frame=L7_Frame();
+ if(frame<0||frame>=L7_FRAMES||!L7_On(C_ENABLED)){native(gobj);return;}
+ float x=cpu->phys.pos.X,y=cpu->phys.pos.Y;
+ Vec2 stick=cpu->input.lstick;
+ if(!l7_ready){
+  native(gobj);
+  l7_reference[frame].sdi=(L7SDI){.stick=stick,.valid=1,.moved=fabs(cpu->phys.pos.X-x)>.001f||fabs(cpu->phys.pos.Y-y)>.001f};
+  if(l7_reference[frame].sdi.moved&&L7_On(C_TELEMETRY))OSReport("L7 SDI REF frame=%d dx=%.6f dy=%.6f\n",frame,cpu->phys.pos.X-x,cpu->phys.pos.Y-y);
+  return;
+ }
+ int sample=-1;
+ if(l7.mode==L7_ACTIVE&&L7_On(C_OPPONENT)==0&&L7_On(C_DI_BUFFER)>0&&cpu->flags.hitlag)
+  sample=l7_sdi_sample(&l7_di,l7_di_hits,l7_di_count,frame);
+ if(sample<0||(sample>0&&!l7_reference[sample].sdi.valid)){native(gobj);return;}
+ L7SDI *ref=sample>0?&l7_reference[sample].sdi:0;
+ u8 tx=cpu->input.timer_lstick_tilt_x,ty=cpu->input.timer_lstick_tilt_y;
+ u8 sx=cpu->input.timer_lstick_smash_x,sy=cpu->input.timer_lstick_smash_y;
+ /* 0x670/671 are consumed SDI timers; 0x673/674 are sticky timers used by
+  * UCF. Disable its fallback while reproducing the already-observed decision. */
+ if(ref)cpu->input.lstick=ref->stick;
+ cpu->input.timer_lstick_tilt_x=ref&&ref->moved?0:254;
+ cpu->input.timer_lstick_tilt_y=254;
+ cpu->input.timer_lstick_smash_x=cpu->input.timer_lstick_smash_y=254;
+ native(gobj);
+ int moved=fabs(cpu->phys.pos.X-x)>.001f||fabs(cpu->phys.pos.Y-y)>.001f;
+ cpu->input.lstick=stick;
+ cpu->input.timer_lstick_smash_x=sx;cpu->input.timer_lstick_smash_y=sy;
+ if(!moved){cpu->input.timer_lstick_tilt_x=tx;cpu->input.timer_lstick_tilt_y=ty;}
+ if(L7_On(C_TELEMETRY))OSReport("L7 SDI APPLY frame=%d sample=%d expected=%d moved=%d dx=%.6f dy=%.6f\n",frame,sample,ref?ref->moved:0,moved,cpu->phys.pos.X-x,cpu->phys.pos.Y-y);
+}
 static int L7_EventMask(int state,L7Input input){
  int mask=127;
  if(state && !(state>=14&&state<=24))mask&=~(1<<L7_DASH_EVENT);
@@ -495,6 +533,8 @@ static void L7_Post(void){
  for(int p=0;p<2;p++){
   L7Fighter f=L7_Fighter(p);
   if(p==1){
+   FighterData *sdi_cpu=Fighter_GetGObj(1)->userdata;
+   if(sdi_cpu->cb.EveryHitlag==(void*)0x8008e4f0)sdi_cpu->cb.EveryHitlag=L7_SDIThink;
    if(!l7_ready&&frame>0&&f.percent>l7_reference[frame-1].fighter[1].percent+.01f)OSReport("L7 DAMAGE frame=%d direct=%d instance=%d source=%x attacker=%x kind=%d\n",frame,f.direct_hit,f.hit_instance,(u32)((FighterData*)Fighter_GetGObj(1)->userdata)->dmg.hit_log.source,(u32)Fighter_GetGObj(0),L7_Fighter(0).attack_kind);
    if(l7.mode==L7_ACTIVE){
     if(l7_direct_hit(&l7_di_previous,&f)&&L7_On(C_OPPONENT)==0&&L7_On(C_DI_BUFFER)>0){

@@ -34,6 +34,15 @@ int l7_di_sample(L7DIState *s,const L7DIHit *hits,int count,int frame,float rema
  return sample;
 }
 
+/* SDI steps are consumed once per corresponding hitlag frame. An extended live
+ * hitlag must not repeat the reference's last SDI step (unlike held DI input). */
+int l7_sdi_sample(const L7DIState *s,const L7DIHit *hits,int count,int frame){
+ if(s->matched<0||s->matched>=count||frame<s->onset)return -1;
+ const L7DIHit *hit=&hits[s->matched];
+ int sample=hit->frame+frame-s->onset;
+ return sample<=hit->last_input?sample:0;
+}
+
 /* NTSC common states: missed ground tech (183/191), then the six passive states. */
 int l7_tech_outcome(int state){return state==183||state==191||(state>=199&&state<=204);}
 static int l7_tech_flying(int state){return (state>=75&&state<=91)||state==38;}

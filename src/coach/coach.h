@@ -35,6 +35,7 @@ typedef struct { int cursor,matched,onset,tech_matched,tech_until,tech_wait_boun
 void l7_di_reset(L7DIState*,const L7DIHit*,int,int);
 int l7_di_match(L7DIState*,const L7DIHit*,int,int,int,int);
 int l7_di_sample(L7DIState*,const L7DIHit*,int,int,float);
+int l7_sdi_sample(const L7DIState*,const L7DIHit*,int,int);
 int l7_tech_outcome(int);
 int l7_tech_prepare(L7DIState*,const L7DIHit*,int,const L7Fighter*,int,float*,float);
 void l7_tech_reference(L7DIHit*,const L7Fighter*,int,int);

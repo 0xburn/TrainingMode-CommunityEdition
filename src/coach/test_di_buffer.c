@@ -7,9 +7,15 @@ int main(void){
  for(int delta=-3;delta<=3;delta++){
   l7_di_reset(&s,hits,4,100);
   assert(l7_di_match(&s,hits,4,100+delta,1,3)==0);
+  assert(l7_sdi_sample(&s,hits,4,99+delta)==-1);
+  assert(l7_sdi_sample(&s,hits,4,100+delta)==100);
+  assert(l7_sdi_sample(&s,hits,4,101+delta)==101);
+  assert(l7_sdi_sample(&s,hits,4,105+delta)==105);
+  assert(l7_sdi_sample(&s,hits,4,106+delta)==0); /* No repeated SDI at longer hitlag. */
   assert(l7_di_sample(&s,hits,4,101+delta,5)==101);
   assert(l7_di_sample(&s,hits,4,103+delta,1)==105);
   assert(l7_di_sample(&s,hits,4,104+delta,0)==0);
+  assert(l7_sdi_sample(&s,hits,4,104+delta)==-1);
  }
  l7_di_reset(&s,hits,4,100);assert(l7_di_match(&s,hits,4,100,1,0)==-1);
  assert(l7_di_match(&s,hits,4,96,1,3)==-1);
